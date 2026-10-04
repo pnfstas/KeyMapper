@@ -1,0 +1,17 @@
+<Solution>
+  <Configurations>
+    <BuildType Name="Debug" />
+    <BuildType Name="Debug(x64)" />
+    <BuildType Name="Release" />
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+  </Configurations>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+  </Folder>
+  <Project Path="KeyMapper.csproj">
+    <BuildType Solution="Debug(x64)|x64" Project="Debug" />
+    <Platform Solution="*|x64" Project="x64" />
+    <Build Solution="Debug(x64)|*" Project="false" />
+  </Project>
+</Solution>

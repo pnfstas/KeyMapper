@@ -1,0 +1,46 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+      <OutputType>WinExe</OutputType>
+      <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+      <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+      <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+      <WindowsPackageType>None</WindowsPackageType>
+      <EnableMsixTooling>true</EnableMsixTooling>
+      <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+      <UseWinUI>true</UseWinUI>
+      <ImplicitUsings>enable</ImplicitUsings>
+      <Nullable>enable</Nullable>
+      <Configurations>Debug;Release</Configurations>
+      <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' And ('$(Platform)' == '' Or '$(Platform)' == 'AnyCPU')">win-x64</RuntimeIdentifier>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="misc\**" />
+    <EmbeddedResource Remove="misc\**" />
+    <None Remove="misc\**" />
+    <Page Remove="misc\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="H.NotifyIcon.WinUI" Version="2.4.1" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Page Update="App.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Page Update="MainWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PRIResource Remove="misc\**" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="KeyMapper.MainWindow"
+    x:Name="KeyMapperWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:KeyMapper"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:tb="using:H.NotifyIcon"
+    mc:Ignorable="d">
+    <Grid
+        x:Name="MainGrid"
+        HorizontalAlignment="Stretch"
+        VerticalAlignment="Stretch">
+        <Grid.Resources>
+            <local:BoolToBrushConverter x:Key="BoolToBrushConverter"/>
+            <XamlUICommand x:Key="ModifySettingsCommand" Label="Modify settings" ExecuteRequested="OnModifySettingsCommandExecuteRequested"/>
+            <XamlUICommand x:Key="StartMappingCommand" Label="Start" ExecuteRequested="OnStartMappingCommandExecuteRequested"/>
+            <XamlUICommand x:Key="StopMappingCommand" Label="Stop" ExecuteRequested="OnStopMappingCommandExecuteRequested"/>
+            <XamlUICommand x:Key="ExitCommand" Label="Exit" ExecuteRequested="OnExitCommandExecuteRequested"/>
+            <XamlUICommand x:Key="ApplySettingsCommand" Label="Apply" ExecuteRequested="OnApplySettingsCommandExecuteRequested"/>
+            <XamlUICommand x:Key="CancelSettingsCommand" Label="Cancel" ExecuteRequested="OnCancelSettingsCommandExecuteRequested"/>
+            <XamlUICommand x:Key="AddMappingCommand" Label="Add" ExecuteRequested="OnAddMappingCommandExecuteRequested"/>
+            <XamlUICommand x:Key="RemoveMappingCommand" Label="Remove" CanExecuteRequested="OnRemoveMappingCommandCanExecuteRequested" ExecuteRequested="OnRemoveMappingCommandExecuteRequested"/>
+            <XamlUICommand x:Key="ClearMappingCommand" Label="Clear" CanExecuteRequested="OnClearMappingCommandCanExecuteRequested" ExecuteRequested="OnClearMappingCommandExecuteRequested"/>
+        </Grid.Resources>
+        <tb:TaskbarIcon
+            x:Name="TrayIcon"
+            ToolTipText="Shortcut mapper"
+            LeftClickCommand="{StaticResource ModifySettingsCommand}">
+            <tb:TaskbarIcon.IconSource>
+                <tb:GeneratedIconSource
+                    Text=""
+                    FontFamily="Segoe Fluent Icons"
+                    FontSize="70"
+                    Background="Transparent"
+                    Foreground="Aqua"/>
+            </tb:TaskbarIcon.IconSource>
+            <tb:TaskbarIcon.ContextFlyout>
+                <MenuFlyout>
+                    <MenuFlyoutItem Text="Settings" Command="{StaticResource ModifySettingsCommand}"/>
+                    <MenuFlyoutSeparator/>
+                    <MenuFlyoutItem Text="Start" Command="{StaticResource StartMappingCommand}"/>
+                    <MenuFlyoutItem Text="Stop" Command="{StaticResource StopMappingCommand}"/>
+                    <MenuFlyoutSeparator/>
+                    <MenuFlyoutItem Text="Exit" Command="{StaticResource ExitCommand}"/>
+                </MenuFlyout>
+            </tb:TaskbarIcon.ContextFlyout>
+        </tb:TaskbarIcon>
+        <ScrollView>
+            <Grid 
+                x:Name="KeyMapGrid"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <TextBlock
+                    Grid.Column="0"
+                    Grid.Row="0"
+                    x:Name="ApplicationTextBlock"
+                    Height="Auto"
+                    Margin="0,0,0,5"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Center">
+                    Application name:
+                </TextBlock>
+                <ComboBox
+                    Grid.Column="1"
+                    Grid.Row="0"
+                    x:Name="ApplicationComboBox"
+                    ItemsSource="{x:Bind KeyMapper.ActiveWindows, Mode=OneWay}"
+                    SelectedItem="{x:Bind KeyMapper.SelectedWindowInfo, Mode=TwoWay}"
+                    DisplayMemberPath="Title"
+                    Style="{StaticResource ComboBoxMainStyle}"
+                    Loaded="OnApplicationComboBoxLoaded">
+                </ComboBox>
+                <CommandBar
+                    Grid.Column="0"
+                    Grid.ColumnSpan="2"
+                    Grid.Row="1"
+                    x:Name="KeyMapCommandBar"
+                    OverflowButtonVisibility="Collapsed"
+                    DefaultLabelPosition="Right"
+                    Height="Auto"
+                    Margin="0,10,0,0"
+                    Background="LightGray"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Center">
+                    <CommandBar.Content>
+                        Shortcut map
+                    </CommandBar.Content>
+                    <CommandBar.PrimaryCommands>
+                        <AppBarButton Command="{StaticResource AddMappingCommand}"/>
+                        <AppBarButton Command="{StaticResource RemoveMappingCommand}"/>
+                        <AppBarButton Command="{StaticResource ClearMappingCommand}"/>
+                    </CommandBar.PrimaryCommands>
+                </CommandBar>
+                <ListView
+                    Grid.Column="0"
+                    Grid.ColumnSpan="2"
+                    Grid.Row="2"
+                    x:Name="KeyMapListView"
+                    Style="{StaticResource ListViewMainStyle}"
+                    ItemsSource="{x:Bind Path=KeyMapper.ShortcutMap, Mode=OneWay}"
+                    SelectedItem="{x:Bind Path=KeyMapper.SelectedShortcutPair, Mode=TwoWay}">
+                    <ListView.Resources>
+                        <SolidColorBrush x:Key="ListViewItemBackground" Color="Transparent"/>
+                        <SolidColorBrush x:Key="ListViewItemBackgroundPointerOver" Color="#20FFFFFF"/>
+                        <SolidColorBrush x:Key="ListViewItemBackgroundSelected" Color="#FF429CE3"/>
+                        <SolidColorBrush x:Key="ListViewItemBackgroundSelectedPointerOver" Color="LightBlue"/>
+                        <SolidColorBrush x:Key="ListViewItemBackgroundSelectedPressed" Color="#FF429CE3"/>
+                    </ListView.Resources>
+                    <ListView.HeaderTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Border
+                                    Grid.Column="0"
+                                    BorderBrush="Black"
+                                    BorderThickness="1"
+                                    HorizontalAlignment="Stretch"
+                                    VerticalAlignment="Center">
+                                    <TextBlock
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center">
+                                        Current shortcut
+                                    </TextBlock>
+                                </Border>
+                                <Border
+                                    Grid.Column="1"
+                                    BorderBrush="Black"
+                                    BorderThickness="1"
+                                    HorizontalAlignment="Stretch"
+                                    VerticalAlignment="Center">
+                                    <TextBlock
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center">
+                                        New shortcut
+                                    </TextBlock>
+                                </Border>
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.HeaderTemplate>
+                    <ListView.ItemTemplate>
+                        <DataTemplate x:DataType="local:ShortcutPair">
+                            <Grid>
+                                <Grid.Resources>
+                                    <ResourceDictionary>
+                                        <ResourceDictionary.ThemeDictionaries>
+                                            <ResourceDictionary x:Key="Default">
+                                                <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="Transparent"/>
+                                                <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="Transparent"/>
+                                                <SolidColorBrush x:Key="TextControlBackground" Color="Transparent"/>
+                                                <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="Transparent"/>
+                                                <SolidColorBrush x:Key="TextControlBorderBrush" Color="Transparent"/>
+                                                <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="Transparent"/>
+                                            </ResourceDictionary>  
+                                        </ResourceDictionary.ThemeDictionaries>
+                                    </ResourceDictionary>
+                                </Grid.Resources>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Border
+                                    Grid.Column="0"
+                                    BorderBrush="Black"
+                                    BorderThickness="1"
+                                    HorizontalAlignment="Stretch"
+                                    VerticalAlignment="Center">
+                                    <TextBox
+                                        x:Name="CurrentShortcutTextBox"
+                                        Style="{StaticResource ListViewCell}"
+                                        Text="{x:Bind Path=CurrentShortcut.Description, Mode=OneWay}"
+                                        GotFocus="OnCurrentShortcutTextBoxGotFocus"
+                                        PreviewKeyDown="OnCurrentShortcutTextBoxPreviewKeyDown"
+                                        PreviewKeyUp="OnCurrentShortcutTextBoxPreviewKeyUp">
+                                    </TextBox>
+                                </Border>
+                                <Border
+                                    Grid.Column="1"
+                                    BorderBrush="Black"
+                                    BorderThickness="1"
+                                    HorizontalAlignment="Stretch"
+                                    VerticalAlignment="Center">
+                                    <TextBox
+                                        x:Name="NewShortcutTextBox"
+                                        Style="{StaticResource ListViewCell}"
+                                        Text="{x:Bind Path=NewShortcut.Description, Mode=OneWay}"
+                                        GotFocus="OnNewShortcutTextBoxGotFocus"
+                                        PreviewKeyDown="OnNewShortcutTextBoxPreviewKeyDown"
+                                        PreviewKeyUp="OnNewShortcutTextBoxPreviewKeyUp">
+                                    </TextBox>
+                                </Border>
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+                <Button
+                    Grid.Column="0"
+                    Grid.Row="3"
+                    x:Name="ApplyButton"
+                    Style="{StaticResource ButtonMainStyle}"
+                    Margin="0,30,10,30"
+                    HorizontalAlignment="Right"
+                    Command="{StaticResource ApplySettingsCommand}">
+                </Button>
+                <Button
+                    Grid.Column="1"
+                    Grid.Row="3"
+                    x:Name="CancelButton"
+                    Style="{StaticResource ButtonMainStyle}"
+                    Margin="10,30,0,30"
+                    HorizontalAlignment="Left"
+                    Command="{StaticResource CancelSettingsCommand}">
+                </Button>
+            </Grid>
+        </ScrollView>
+    </Grid>
+</Window>
