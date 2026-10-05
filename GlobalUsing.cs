@@ -1,4 +1,5 @@
 ﻿global using BOOL = bool;
+global using BYTE = byte;
 global using WORD = ushort;
 global using DWORD = uint;
 global using UINT = uint;
@@ -7,8 +8,8 @@ global using ULONG = uint;
 global using WPARAM = nint;
 global using LPARAM = nint;
 global using LRESULT = nint;
-global using LONG_PTR = long;
-global using ULONG_PTR = ulong;
+global using LONG_PTR = nint;
+global using ULONG_PTR = nuint;
 global using LPSTR = string;
 global using LPCSTR = string;
 global using LPWSTR = string;
