@@ -15,11 +15,13 @@
         VerticalAlignment="Stretch">
         <Grid.Resources>
             <local:BoolToBrushConverter x:Key="BoolToBrushConverter"/>
+            <XamlUICommand x:Key="UpdateActiveWindowsCommand" Label="..." ExecuteRequested="OnUpdateActiveWindowsCommandExecuteRequested"/>
             <XamlUICommand x:Key="ModifySettingsCommand" Label="Modify settings" ExecuteRequested="OnModifySettingsCommandExecuteRequested"/>
             <XamlUICommand x:Key="StartMappingCommand" Label="Start" ExecuteRequested="OnStartMappingCommandExecuteRequested"/>
             <XamlUICommand x:Key="StopMappingCommand" Label="Stop" ExecuteRequested="OnStopMappingCommandExecuteRequested"/>
             <XamlUICommand x:Key="ExitCommand" Label="Exit" ExecuteRequested="OnExitCommandExecuteRequested"/>
             <XamlUICommand x:Key="ApplySettingsCommand" Label="Apply" ExecuteRequested="OnApplySettingsCommandExecuteRequested"/>
+            <XamlUICommand x:Key="ApplySettingsAndStartMappingCommand" Label="Apply" ExecuteRequested="OnApplySettingsAndStartMappingCommandExecuteRequested"/>
             <XamlUICommand x:Key="CancelSettingsCommand" Label="Cancel" ExecuteRequested="OnCancelSettingsCommandExecuteRequested"/>
             <XamlUICommand x:Key="AddMappingCommand" Label="Add" ExecuteRequested="OnAddMappingCommandExecuteRequested"/>
             <XamlUICommand x:Key="RemoveMappingCommand" Label="Remove" CanExecuteRequested="OnRemoveMappingCommandCanExecuteRequested" ExecuteRequested="OnRemoveMappingCommandExecuteRequested"/>
@@ -55,7 +57,8 @@
                 VerticalAlignment="Stretch">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="0.8*"/>
+                    <ColumnDefinition Width="0.2*"/>
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -83,9 +86,20 @@
                     Style="{StaticResource ComboBoxMainStyle}"
                     Loaded="OnApplicationComboBoxLoaded">
                 </ComboBox>
+                <Button
+                    Grid.Column="2"
+                    Grid.Row="0"
+                    x:Name="UpdateActiveWindowsButton"
+                    Style="{StaticResource ButtonMainStyle}"
+                    Height="35"
+                    Margin="5,0,0,0"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Center"
+                    Command="{StaticResource UpdateActiveWindowsCommand}">
+                </Button>
                 <CommandBar
                     Grid.Column="0"
-                    Grid.ColumnSpan="2"
+                    Grid.ColumnSpan="3"
                     Grid.Row="1"
                     x:Name="KeyMapCommandBar"
                     OverflowButtonVisibility="Collapsed"
@@ -106,7 +120,7 @@
                 </CommandBar>
                 <ListView
                     Grid.Column="0"
-                    Grid.ColumnSpan="2"
+                    Grid.ColumnSpan="3"
                     Grid.Row="2"
                     x:Name="KeyMapListView"
                     Style="{StaticResource ListViewMainStyle}"
@@ -208,24 +222,28 @@
                         </DataTemplate>
                     </ListView.ItemTemplate>
                 </ListView>
-                <Button
+                <StackPanel
                     Grid.Column="0"
+                    Grid.ColumnSpan="3"
                     Grid.Row="3"
-                    x:Name="ApplyButton"
-                    Style="{StaticResource ButtonMainStyle}"
-                    Margin="0,30,10,30"
-                    HorizontalAlignment="Right"
-                    Command="{StaticResource ApplySettingsCommand}">
-                </Button>
-                <Button
-                    Grid.Column="1"
-                    Grid.Row="3"
-                    x:Name="CancelButton"
-                    Style="{StaticResource ButtonMainStyle}"
-                    Margin="10,30,0,30"
-                    HorizontalAlignment="Left"
-                    Command="{StaticResource CancelSettingsCommand}">
-                </Button>
+                    Orientation="Horizontal"
+                    Margin="0,30,0,30"
+                    HorizontalAlignment="Center">
+                    <Button
+                        x:Name="CancelButton"
+                        Style="{StaticResource ButtonMainStyle}"
+                        Margin="0,0,10,0"
+                        HorizontalAlignment="Left"
+                        Command="{StaticResource CancelSettingsCommand}">
+                    </Button>
+                    <Button
+                        x:Name="ApplyButton"
+                        Style="{StaticResource ButtonMainStyle}"
+                        Margin="10,0,0,0"
+                        HorizontalAlignment="Right"
+                        Command="{StaticResource ApplySettingsCommand}">
+                    </Button>
+                </StackPanel>
             </Grid>
         </ScrollView>
     </Grid>

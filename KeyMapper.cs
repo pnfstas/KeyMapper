@@ -607,8 +607,19 @@ namespace KeyMapper
         private HOOKPROC hookProc;
         private WNDENUMPROC wndEnumProc;
 		private HashSet<int> PressedKeys { get; } = [];
-        public List<WindowInfo> ActiveWindows { get; }
-        public ObservableCollection<ShortcutPair> ShortcutMap { get; } = new ObservableCollection<ShortcutPair>();
+		public List<WindowInfo> ActiveWindows 
+		{ 
+			get;
+			set
+			{
+				if(field != value)
+				{
+					field = value;
+					OnPropertyChanged("ActiveWindows");
+				}
+			}
+		}
+		public ObservableCollection<ShortcutPair> ShortcutMap { get; } = new ObservableCollection<ShortcutPair>();
         public WindowInfo? SelectedWindowInfo
 		{
             get;
@@ -639,24 +650,29 @@ namespace KeyMapper
             ShellWindowHandler = GetShellWindow();
             hookProc = LowLevelKeyboardProc;
             wndEnumProc = EnumWindowsProc;
+			ActiveWindows = GetActiveWindows();
+		}
+		public List<WindowInfo> GetActiveWindows()
+		{
 			List<WindowInfo> listWindows = new List<WindowInfo>();
 			GCHandle handle = GCHandle.Alloc(listWindows, GCHandleType.Normal);
 			try
-            {
-                nint ptr = GCHandle.ToIntPtr(handle);
-                EnumWindows(wndEnumProc, ptr);
-            }
-            finally
-            {
-                if(handle.IsAllocated)
-                {
-                    handle.Free();
-				}
-				ActiveWindows = listWindows.Count > 0 ? listWindows.OrderBy(curWindowInfo => curWindowInfo.Title).ToList() : new List<WindowInfo>();
+			{
+				nint ptr = GCHandle.ToIntPtr(handle);
+				EnumWindows(wndEnumProc, ptr);
 			}
-			Debug.WriteLine($"ActiveWindows.Count: {ActiveWindows.Count}");
+			finally
+			{
+				if(handle.IsAllocated)
+				{
+					handle.Free();
+				}
+				listWindows = listWindows.OrderBy(curWindowInfo => curWindowInfo.Title).ToList();
+			}
+			Debug.WriteLine($"listWindows.Count: {listWindows.Count}");
+			return listWindows;
 		}
-        private BOOL EnumWindowsProc(HWND hwnd, LPARAM lParam)
+		private BOOL EnumWindowsProc(HWND hwnd, LPARAM lParam)
         {
             try
             {
@@ -774,7 +790,8 @@ namespace KeyMapper
 			bool isFound =false;
 			try
             {
-				ShortcutPair? shortcutPair = ShortcutMap.FirstOrDefault(pair => PressedKeys.SetEquals(pair.NewShortcut.KeyCodes));
+				ShortcutPair? shortcutPair = ShortcutMap.OrderByDescending(pair => pair.CurrentShortcut.KeyCodes.Count)
+					.FirstOrDefault(pair => PressedKeys.SetEquals(pair.NewShortcut.KeyCodes));
 				if(shortcutPair != null && (isFound = shortcutPair.NewShortcut.KeyCodes.Count > 0))
 				{
 					int count = shortcutPair.CurrentShortcut.KeyCodes.Count;
@@ -863,7 +880,7 @@ namespace KeyMapper
             string[] arrPath = sourceFilePath.Split('\\', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
             if(arrPath.Length > 2)
             {
-                arrPath[arrPath.Length - 1] = "Settings.json";
+                arrPath[arrPath.Length - 1] = "settings\\Settings.json";
                 fileName = string.Join('\\', arrPath);
             }
             else

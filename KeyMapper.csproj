@@ -17,9 +17,13 @@
 
   <ItemGroup>
     <Compile Remove="misc\**" />
+    <Compile Remove="settings\**" />
     <EmbeddedResource Remove="misc\**" />
+    <EmbeddedResource Remove="settings\**" />
     <None Remove="misc\**" />
+    <None Remove="settings\**" />
     <Page Remove="misc\**" />
+    <Page Remove="settings\**" />
   </ItemGroup>
 
   <ItemGroup>
@@ -41,6 +45,10 @@
 
   <ItemGroup>
     <PRIResource Remove="misc\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PRIResource Remove="settings\**" />
   </ItemGroup>
 
 </Project>

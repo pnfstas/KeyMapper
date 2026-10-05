@@ -77,7 +77,11 @@ namespace KeyMapper
 				AppWindow.Closing -= OnAppWindowClosing;
             }
         }
-        private void OnModifySettingsCommandExecuteRequested(XamlUICommand sender, ExecuteRequestedEventArgs args)
+		private void OnUpdateActiveWindowsCommandExecuteRequested(XamlUICommand sender, ExecuteRequestedEventArgs args)
+		{
+			KeyMapper.ActiveWindows = KeyMapper.GetActiveWindows();
+		}
+		private void OnModifySettingsCommandExecuteRequested(XamlUICommand sender, ExecuteRequestedEventArgs args)
         {
             AppWindow.Show(true);
         }
@@ -95,15 +99,20 @@ namespace KeyMapper
             isExiting = true;
             Close();
         }
-        private void OnApplySettingsCommandExecuteRequested(XamlUICommand sender, ExecuteRequestedEventArgs args)
-        {
-            HideWindow();
-        }
         private void OnCancelSettingsCommandExecuteRequested(XamlUICommand sender, ExecuteRequestedEventArgs args)
         {
             HideWindow();
         }
-        private void OnAddMappingCommandExecuteRequested(XamlUICommand sender, ExecuteRequestedEventArgs args)
+		private void OnApplySettingsCommandExecuteRequested(XamlUICommand sender, ExecuteRequestedEventArgs args)
+		{
+			HideWindow();
+		}
+		private void OnApplySettingsAndStartMappingCommandExecuteRequested(XamlUICommand sender, ExecuteRequestedEventArgs args)
+		{
+			HideWindow();
+			KeyMapper.StartMapping();
+		}
+		private void OnAddMappingCommandExecuteRequested(XamlUICommand sender, ExecuteRequestedEventArgs args)
         {
             KeyMapper.ShortcutMap.Add(new ShortcutPair());
         }
