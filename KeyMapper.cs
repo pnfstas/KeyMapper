@@ -765,11 +765,15 @@ namespace KeyMapper
 						PressedKeys.Remove(vkCode);
 						if(shortcutPair?.NewShortcut?.IsModifierKeysOnly == true)
 						{
-							if(MapShortcut(shortcutPair))
+							LPARAM extraInfo = GetMessageExtraInfo();
+							keybd_event(VK_NONAME, 0, 0, (ULONG_PTR)extraInfo);
+							keybd_event(VK_NONAME, 0, KEYEVENTF_KEYUP, (ULONG_PTR)extraInfo);
+							foreach(int curCode in shortcutPair.NewShortcut.KeyCodes)
 							{
-								LPARAM extraInfo = GetMessageExtraInfo();
-								keybd_event(VK_NONAME, 0, 0, (ULONG_PTR)extraInfo);
-								keybd_event(VK_NONAME, 0, 2, (ULONG_PTR)extraInfo);
+								keybd_event(VK_NONAME, 0, KEYEVENTF_KEYUP, (ULONG_PTR)extraInfo);
+							}
+							if(MapShortcutWithDelay(shortcutPair))
+							{
 								return 1;
 							}
 						}
@@ -817,8 +821,8 @@ namespace KeyMapper
 			ShortcutPair? shortcutPair = null;
 			try
 			{
-				shortcutPair = ShortcutMap.OrderByDescending(pair => pair.CurrentShortcut.KeyCodes.Count)
-					.FirstOrDefault(pair => PressedKeys.SetEquals(pair.NewShortcut.KeyCodes));
+				shortcutPair = ShortcutMap.OrderByDescending(pair => pair.NewShortcut.KeyCodes.Count)
+					.FirstOrDefault(pair => PressedKeys.SetEquals(pair.NewShortcut.KeyCodes.Select(NormalizeKey)));
 				if(shortcutPair != null && shortcutPair.NewShortcut.KeyCodes.Count == 0)
 				{
 					shortcutPair = null;
@@ -872,7 +876,17 @@ namespace KeyMapper
             }
 			return isMapped;
 		}
-        public void StartMapping()
+		public bool MapShortcutWithDelay(ShortcutPair? shortcutPair)
+		{
+			Task<bool> task = Task.Run(async () =>
+			{
+				await Task.Delay(15);
+				return MapShortcut(shortcutPair);
+			});
+			task.Wait();
+			return task.Result;
+		}
+		public void StartMapping()
         {
             using(Process process = Process.GetCurrentProcess())
             {
