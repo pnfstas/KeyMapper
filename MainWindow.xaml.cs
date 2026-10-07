@@ -73,7 +73,6 @@ namespace KeyMapper
             }
             else
             {
-                KeyMapper.SaveSettings();
 				AppWindow.Closing -= OnAppWindowClosing;
             }
         }
@@ -95,7 +94,8 @@ namespace KeyMapper
         }
         private void OnExitCommandExecuteRequested(XamlUICommand sender, ExecuteRequestedEventArgs args)
         {
-            TrayIcon.Dispose();
+			KeyMapper.SaveSettings();
+			TrayIcon.Dispose();
             isExiting = true;
             Close();
         }

@@ -734,58 +734,67 @@ namespace KeyMapper
         }
         private LRESULT LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
         {
+			LRESULT result = 0;
 			KBDLLHOOKSTRUCT hookStruct = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam);
 			if(nCode >= 0 && (hookStruct.flags & LLKHF_INJECTED) == 0)
             {
                 try
                 {
 					int vkCode = NormalizeKey((int)hookStruct.vkCode);
-					//int vkCode = (int)hookStruct.vkCode;
 					bool isKeyDown = wParam == (nint)WM_KEYDOWN || wParam == (nint)WM_SYSKEYDOWN;
                     bool isKeyUp = wParam == (nint)WM_KEYUP || wParam == (nint)WM_SYSKEYUP;
-					ShortcutPair? shortcutPair = null;
 					if(isKeyDown)
-                    {
-                        bool isNewKey = PressedKeys.Add(vkCode);
-                        if(isNewKey)
-                        {
-							shortcutPair = FindShortcut();
-							if(shortcutPair?.NewShortcut?.IsModifierKeysOnly == false)
+					{
+						if(IsTargetApplicationActive())
+						{
+							bool isNewKey = PressedKeys.Add(vkCode);
+							if(isNewKey)
 							{
-								if(MapShortcut(shortcutPair))
+								ShortcutPair? shortcutPair = FindShortcut();
+								if(shortcutPair != null)
 								{
-									return 1;
+									if(shortcutPair.NewShortcut.IsModifierKeysOnly)
+									{
+										LPARAM extraInfo = GetMessageExtraInfo();
+										keybd_event(VK_NONAME, 0, 0, (ULONG_PTR)extraInfo);
+										keybd_event(VK_NONAME, 0, KEYEVENTF_KEYUP, (ULONG_PTR)extraInfo);
+										foreach(int curCode in shortcutPair.NewShortcut.KeyCodes)
+										{
+											keybd_event((BYTE)curCode, 0, KEYEVENTF_KEYUP, (ULONG_PTR)extraInfo);
+										}
+										Task.Run(async () =>
+										{
+											await Task.Delay(15);
+											MapShortcut(shortcutPair);
+										});
+									}
+									else
+									{
+										MapShortcut(shortcutPair);
+									}
+									result = 1;
+								}
+								else
+								{
+									PressedKeys.Remove(vkCode);
 								}
 							}
 						}
 					}
-                    else if(isKeyUp)
-                    {
-						shortcutPair = FindShortcut();
+					else if(isKeyUp)
+					{
 						PressedKeys.Remove(vkCode);
-						if(shortcutPair?.NewShortcut?.IsModifierKeysOnly == true)
-						{
-							LPARAM extraInfo = GetMessageExtraInfo();
-							keybd_event(VK_NONAME, 0, 0, (ULONG_PTR)extraInfo);
-							keybd_event(VK_NONAME, 0, KEYEVENTF_KEYUP, (ULONG_PTR)extraInfo);
-							foreach(int curCode in shortcutPair.NewShortcut.KeyCodes)
-							{
-								keybd_event(VK_NONAME, 0, KEYEVENTF_KEYUP, (ULONG_PTR)extraInfo);
-							}
-							if(MapShortcutWithDelay(shortcutPair))
-							{
-								return 1;
-							}
-						}
+						result = 1;
 					}
                 }
                 catch(Exception e)
                 {
-                    Debug.WriteLine(e);
+					result = 0;
+					Debug.WriteLine(e);
                     //throw;
                 }
             }
-            return CallNextHookEx(nint.Zero, nCode, wParam, lParam);
+            return (INT)result > 0 ? result : CallNextHookEx(nint.Zero, nCode, wParam, lParam);
         }
 		private static int NormalizeKey(int vkCode)
 		{
@@ -836,55 +845,38 @@ namespace KeyMapper
 			}
 			return shortcutPair;
 		}
-		private bool MapShortcut(ShortcutPair? shortcutPair)
+		private void MapShortcut(ShortcutPair shortcutPair)
         {
-			bool isMapped =false;
 			try
             {
-				if(shortcutPair != null && IsTargetApplicationActive())
+				int count = shortcutPair.CurrentShortcut.KeyCodes.Count;
+				int[] newKeyCodes = [.. shortcutPair.CurrentShortcut.KeyCodes];
+				INPUT[] inputs = new INPUT[count * 2];
+				for(int index = 0; index < count; index++)
 				{
-					int count = shortcutPair.CurrentShortcut.KeyCodes.Count;
-					int[] newKeyCodes = [.. shortcutPair.CurrentShortcut.KeyCodes];
-					INPUT[] inputs = new INPUT[count * 2];
-					for(int index = 0; index < count; index++)
+					inputs[index].type = INPUT_KEYBOARD;
+					inputs[index].ki = new KEYBDINPUT()
 					{
-						inputs[index].type = INPUT_KEYBOARD;
-						inputs[index].ki = new KEYBDINPUT()
-						{
-							dwFlags = 0,
-							wVk = (ushort)newKeyCodes[index]
-						};
-					}
-					for(int index = count, keyIndex = count - 1; index < count * 2; index++, keyIndex--)
-					{
-						inputs[index].type = INPUT_KEYBOARD;
-						inputs[index].ki = new KEYBDINPUT()
-						{
-							dwFlags = KEYEVENTF_KEYUP,
-							wVk = (ushort)newKeyCodes[keyIndex]
-						};
-					}
-					SendInput((uint)count * 2, inputs, Marshal.SizeOf<INPUT>());
-					isMapped = true;
+						dwFlags = 0,
+						wVk = (ushort)newKeyCodes[index]
+					};
 				}
+				for(int index = count, keyIndex = count - 1; index < count * 2; index++, keyIndex--)
+				{
+					inputs[index].type = INPUT_KEYBOARD;
+					inputs[index].ki = new KEYBDINPUT()
+					{
+						dwFlags = KEYEVENTF_KEYUP,
+						wVk = (ushort)newKeyCodes[keyIndex]
+					};
+				}
+				SendInput((uint)count * 2, inputs, Marshal.SizeOf<INPUT>());
             }
             catch(Exception e)
             {
-				isMapped = false;
 				Debug.WriteLine(e);
                 throw;
             }
-			return isMapped;
-		}
-		public bool MapShortcutWithDelay(ShortcutPair? shortcutPair)
-		{
-			Task<bool> task = Task.Run(async () =>
-			{
-				await Task.Delay(15);
-				return MapShortcut(shortcutPair);
-			});
-			task.Wait();
-			return task.Result;
 		}
 		public void StartMapping()
         {

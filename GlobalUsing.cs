@@ -2,6 +2,7 @@
 global using BYTE = byte;
 global using WORD = ushort;
 global using DWORD = uint;
+global using INT = int;
 global using UINT = uint;
 global using LONG = int;
 global using ULONG = uint;
