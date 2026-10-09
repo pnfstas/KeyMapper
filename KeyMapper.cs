@@ -753,7 +753,8 @@ namespace KeyMapper
             {
                 try
                 {
-					int vkCode = NormalizeKey((int)hookStruct.vkCode);
+					//int vkCode = NormalizeKey((int)hookStruct.vkCode);
+					int vkCode = (int)hookStruct.vkCode;
 					bool isKeyDown = wParam == (nint)WM_KEYDOWN || wParam == (nint)WM_SYSKEYDOWN;
                     bool isKeyUp = wParam == (nint)WM_KEYUP || wParam == (nint)WM_SYSKEYUP;
 					if(isKeyDown)
@@ -828,7 +829,7 @@ namespace KeyMapper
 			try
 			{
 				shortcutPair = ShortcutMap.OrderByDescending(pair => pair.NewShortcut.KeyCodes.Count)
-					.FirstOrDefault(pair => PressedKeys.SetEquals(pair.NewShortcut.KeyCodes.Select(NormalizeKey)));
+					.FirstOrDefault(pair => PressedKeys.Select(NormalizeKey).SequenceEqual(pair.NewShortcut.KeyCodes.Select(NormalizeKey)));
 				if(shortcutPair != null && (shortcutPair.CurrentShortcut.KeyCodes.Count == 0 || shortcutPair.NewShortcut.KeyCodes.Count == 0))
 				{
 					shortcutPair = null;
