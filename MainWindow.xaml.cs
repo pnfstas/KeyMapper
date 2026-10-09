@@ -94,6 +94,7 @@ namespace KeyMapper
         }
         private void OnExitCommandExecuteRequested(XamlUICommand sender, ExecuteRequestedEventArgs args)
         {
+			KeyMapper.StopMapping();
 			KeyMapper.SaveSettings();
 			TrayIcon.Dispose();
             isExiting = true;

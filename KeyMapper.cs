@@ -766,10 +766,12 @@ namespace KeyMapper
 								ShortcutPair? shortcutPair = FindShortcut();
 								if(shortcutPair != null)
 								{
+									ShortcutPair shortcutPairCopy = shortcutPair;
+									int[] arrPressedKeys = [.. PressedKeys];
 									Task.Run(async () =>
 									{
 										await Task.Delay(15);
-										MapShortcut(shortcutPair);
+										MapShortcut(shortcutPairCopy, arrPressedKeys);
 									});
 									result = 1;
 								}
@@ -778,12 +780,8 @@ namespace KeyMapper
 					}
 					else if(isKeyUp)
 					{
-						ShortcutPair? shortcutPair = FindShortcut();
 						PressedKeys.Remove(vkCode);
-						if(IsTargetApplicationActive() && shortcutPair != null)
-						{
-							result = 1;
-						}
+						result = 0;
 					}
                 }
                 catch(Exception e)
@@ -793,7 +791,7 @@ namespace KeyMapper
                     //throw;
                 }
             }
-            return (INT)result > 0 ? result : CallNextHookEx(nint.Zero, nCode, wParam, lParam);
+            return (INT)result == 1 ? 1 : CallNextHookEx(nint.Zero, nCode, wParam, lParam);
         }
 		private static int NormalizeKey(int vkCode)
 		{
@@ -844,20 +842,20 @@ namespace KeyMapper
 			}
 			return shortcutPair;
 		}
-		private void MapShortcut(ShortcutPair shortcutPair)
+		private void MapShortcut(ShortcutPair shortcutPair, int[] arrPressedKeys)
 		{
 			try
 			{
 				bool isModifierKeysOnlyShortcut = shortcutPair.NewShortcut.IsModifierKeysOnly;
 				int[] arrCurrentKeyCodes = [.. shortcutPair.CurrentShortcut.KeyCodes];
-				int inputCount = arrCurrentKeyCodes.Length * 2 + (isModifierKeysOnlyShortcut ? PressedKeys.Count + 2 : 0);
+				int inputCount = arrCurrentKeyCodes.Length * 2 + (isModifierKeysOnlyShortcut ? arrPressedKeys.Length + 2 : 0);
 				int index = 0;
 				INPUT[] arrInputs = new INPUT[inputCount];
 				if(isModifierKeysOnlyShortcut)
 				{
 					arrInputs[index++].SetKeyboardInput(VK_NONAME);
 					arrInputs[index++].SetKeyboardInput(VK_NONAME, KEYEVENTF_KEYUP);
-					foreach(int vkCode in PressedKeys)
+					foreach(int vkCode in arrPressedKeys)
 					{
 						arrInputs[index++].SetKeyboardInput(vkCode, KEYEVENTF_KEYUP);
 					}
