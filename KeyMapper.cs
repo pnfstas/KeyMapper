@@ -804,6 +804,16 @@ namespace KeyMapper
 				_ => vkCode
 			};
 		}
+		private static int DenormalizeKey(int vkCode)
+		{
+			return vkCode switch
+			{
+				VK_CONTROL => VK_LCONTROL,
+				VK_SHIFT => VK_LSHIFT,
+				VK_MENU => VK_LMENU,
+				_ => vkCode
+			};
+		}
 		private bool IsTargetApplicationActive()
         {
             bool isActive = false;
@@ -828,8 +838,9 @@ namespace KeyMapper
 			ShortcutPair? shortcutPair = null;
 			try
 			{
+				HashSet<int> NormalizedPressedKeys = PressedKeys.Select(NormalizeKey).ToHashSet();
 				shortcutPair = ShortcutMap.OrderByDescending(pair => pair.NewShortcut.KeyCodes.Count)
-					.FirstOrDefault(pair => PressedKeys.Select(NormalizeKey).SequenceEqual(pair.NewShortcut.KeyCodes.Select(NormalizeKey)));
+					.FirstOrDefault(pair => NormalizedPressedKeys.SetEquals(pair.NewShortcut.KeyCodes.Select(NormalizeKey)));
 				if(shortcutPair != null && (shortcutPair.CurrentShortcut.KeyCodes.Count == 0 || shortcutPair.NewShortcut.KeyCodes.Count == 0))
 				{
 					shortcutPair = null;
@@ -848,7 +859,7 @@ namespace KeyMapper
 			try
 			{
 				bool isModifierKeysOnlyShortcut = shortcutPair.NewShortcut.IsModifierKeysOnly;
-				int[] arrCurrentKeyCodes = [.. shortcutPair.CurrentShortcut.KeyCodes];
+				int[] arrCurrentKeyCodes = [.. shortcutPair.CurrentShortcut.KeyCodes.Select(DenormalizeKey)];
 				int inputCount = arrCurrentKeyCodes.Length * 2 + (isModifierKeysOnlyShortcut ? arrPressedKeys.Length + 2 : 0);
 				int index = 0;
 				INPUT[] arrInputs = new INPUT[inputCount];
