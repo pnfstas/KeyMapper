@@ -853,6 +853,13 @@ namespace KeyMapper
 				INPUT[] arrInputs = new INPUT[inputCount];
 				if(isModifierKeysOnlyShortcut)
 				{
+					lock(PressedKeys)
+					{
+						foreach(int vkCode in arrPressedKeys)
+						{
+							PressedKeys.Remove(vkCode);
+						}
+					}
 					arrInputs[index++].SetKeyboardInput(VK_NONAME);
 					arrInputs[index++].SetKeyboardInput(VK_NONAME, KEYEVENTF_KEYUP);
 					foreach(int vkCode in arrPressedKeys)
