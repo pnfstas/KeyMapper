@@ -21,6 +21,7 @@ using static KeyMapper.KeyboardEventFlags;
 using static KeyMapper.KeyboardMsg;
 using static KeyMapper.UCmd;
 using static KeyMapper.VirtualKeys;
+using static KeyMapper.VirtualKeyMapTypes;
 using static KeyMapper.Win32Helper;
 using static KeyMapper.WindowStyles;
 using static System.Runtime.InteropServices.JavaScript.JSType;
@@ -384,6 +385,14 @@ namespace KeyMapper
         public const uint KEYEVENTF_UNICODE     = 0x0004;
         public const uint KEYEVENTF_SCANCODE    = 0x0008;
     }
+	public struct VirtualKeyMapTypes
+	{
+		public const uint MAPVK_VK_TO_VSC		= 0;
+		public const uint MAPVK_VSC_TO_VK		= 1;
+		public const uint MAPVK_VK_TO_CHAR		= 2;
+		public const uint MAPVK_VSC_TO_VK_EX	= 3;
+		public const uint MAPVK_VK_TO_VSC_EX	= 4;
+	}
     [StructLayout(LayoutKind.Sequential)]
     public struct KBDLLHOOKSTRUCT
     {
@@ -441,8 +450,8 @@ namespace KeyMapper
 			ki = new KEYBDINPUT()
 			{
 				wVk = (WORD)vkCode,
-				wScan = 0,
-				dwFlags = dwFlags,
+				wScan = (WORD)MapVirtualKey((UINT)vkCode, MAPVK_VK_TO_VSC),
+				dwFlags = dwFlags | KEYEVENTF_SCANCODE,
 				time = 0,
 				dwExtraInfo = (ULONG_PTR)GetMessageExtraInfo()
 			};
@@ -543,6 +552,10 @@ namespace KeyMapper
 			[In] ULONG_PTR dwExtraInfo);
 		[DllImport("User32.dll", CharSet = CharSet.Auto, SetLastError = true)]
 		public static extern LPARAM GetMessageExtraInfo();
+		[DllImport("User32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+		public static extern UINT MapVirtualKey(
+			[In] UINT uCode,
+			[In] UINT uMapType);
 	}
 	public class Shortcut : INotifyPropertyChanged
 	{
@@ -638,6 +651,7 @@ namespace KeyMapper
         private HOOKPROC hookProc;
         private WNDENUMPROC wndEnumProc;
 		private HashSet<int> PressedKeys { get; } = [];
+		private bool IsMappingInProgress { get; set; } = false;
 		public List<WindowInfo> ActiveWindows 
 		{ 
 			get;
@@ -753,35 +767,51 @@ namespace KeyMapper
             {
                 try
                 {
-					//int vkCode = NormalizeKey((int)hookStruct.vkCode);
-					int vkCode = (int)hookStruct.vkCode;
+					//int vkCode = (int)hookStruct.vkCode;
+					int vkCode = NormalizeKey((int)hookStruct.vkCode);
 					bool isKeyDown = wParam == (nint)WM_KEYDOWN || wParam == (nint)WM_SYSKEYDOWN;
                     bool isKeyUp = wParam == (nint)WM_KEYUP || wParam == (nint)WM_SYSKEYUP;
 					if(isKeyDown)
 					{
 						if(IsTargetApplicationActive())
 						{
-							bool isNewKey = PressedKeys.Add(vkCode);
-							if(isNewKey)
+							if(!IsMappingInProgress)
 							{
-								ShortcutPair? shortcutPair = FindShortcut();
-								if(shortcutPair != null)
+								bool isNewKey = PressedKeys.Add(vkCode);
+								if(isNewKey)
 								{
-									ShortcutPair shortcutPairCopy = shortcutPair;
-									int[] arrPressedKeys = [.. PressedKeys];
-									Task.Run(async () =>
+									ShortcutPair? shortcutPair = FindShortcut();
+									if(shortcutPair != null)
 									{
-										await Task.Delay(15);
-										MapShortcut(shortcutPairCopy, arrPressedKeys);
-									});
-									result = 1;
+										ShortcutPair shortcutPairCopy = shortcutPair;
+										int[] arrDenormalizedPressedKeys = [.. PressedKeys.Select(DenormalizeKey)];
+										if(shortcutPair.NewShortcut.IsModifierKeysOnly)
+										{
+											IsMappingInProgress = true;
+											Task.Run(async () =>
+											{
+												await Task.Delay(15);
+												MapShortcut(shortcutPairCopy, arrDenormalizedPressedKeys);
+											});
+										}
+										else
+										{
+											Task.Run(() => MapShortcut(shortcutPairCopy, arrDenormalizedPressedKeys));
+										}
+										result = 1;
+									}
 								}
+							}
+							else
+							{
+								result = 1;
 							}
 						}
 					}
 					else if(isKeyUp)
 					{
 						PressedKeys.Remove(vkCode);
+						IsMappingInProgress = false;
 						result = 0;
 					}
                 }
@@ -854,27 +884,26 @@ namespace KeyMapper
 			}
 			return shortcutPair;
 		}
-		private void MapShortcut(ShortcutPair shortcutPair, int[] arrPressedKeys)
+		private void MapShortcut(ShortcutPair shortcutPair, int[] arrDenormalizedPressedKeys)
 		{
 			try
 			{
 				bool isModifierKeysOnlyShortcut = shortcutPair.NewShortcut.IsModifierKeysOnly;
 				int[] arrCurrentKeyCodes = [.. shortcutPair.CurrentShortcut.KeyCodes.Select(DenormalizeKey)];
-				int inputCount = arrCurrentKeyCodes.Length * 2 + (isModifierKeysOnlyShortcut ? arrPressedKeys.Length + 2 : 0);
+				int inputCount = arrCurrentKeyCodes.Length * 2 + (isModifierKeysOnlyShortcut ? arrDenormalizedPressedKeys.Length + 2 : 0);
 				int index = 0;
 				INPUT[] arrInputs = new INPUT[inputCount];
 				if(isModifierKeysOnlyShortcut)
 				{
+					/*
 					lock(PressedKeys)
 					{
-						foreach(int vkCode in arrPressedKeys)
-						{
-							PressedKeys.Remove(vkCode);
-						}
+						PressedKeys.Clear();
 					}
+					*/
 					arrInputs[index++].SetKeyboardInput(VK_NONAME);
 					arrInputs[index++].SetKeyboardInput(VK_NONAME, KEYEVENTF_KEYUP);
-					foreach(int vkCode in arrPressedKeys)
+					foreach(int vkCode in arrDenormalizedPressedKeys)
 					{
 						arrInputs[index++].SetKeyboardInput(vkCode, KEYEVENTF_KEYUP);
 					}
@@ -904,10 +933,11 @@ namespace KeyMapper
                 {
                     HMODULE hmod = GetModuleHandle(process.MainModule.ModuleName);
                     hHook = SetWindowsHookEx(WH_KEYBOARD_LL, hookProc, hmod, 0);
-                }
+				}
             }
-        }
-        public void StopMapping()
+			IsMappingInProgress = false;
+		}
+		public void StopMapping()
         {
             if(hHook != nint.Zero)
             {
