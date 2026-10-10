@@ -651,7 +651,7 @@ namespace KeyMapper
         private HOOKPROC hookProc;
         private WNDENUMPROC wndEnumProc;
 		private HashSet<int> PressedKeys { get; } = [];
-		private bool IsMappingInProgress { get; set; } = false;
+		//private bool IsMappingInProgress { get; set; } = false;
 		public List<WindowInfo> ActiveWindows 
 		{ 
 			get;
@@ -775,43 +775,34 @@ namespace KeyMapper
 					{
 						if(IsTargetApplicationActive())
 						{
-							if(!IsMappingInProgress)
+							bool isNewKey = PressedKeys.Add(vkCode);
+							if(isNewKey)
 							{
-								bool isNewKey = PressedKeys.Add(vkCode);
-								if(isNewKey)
+								ShortcutPair? shortcutPair = FindShortcut();
+								if(shortcutPair != null)
 								{
-									ShortcutPair? shortcutPair = FindShortcut();
-									if(shortcutPair != null)
+									ShortcutPair shortcutPairCopy = shortcutPair;
+									int[] arrDenormalizedPressedKeys = [.. PressedKeys.Select(DenormalizeKey)];
+									if(shortcutPair.NewShortcut.IsModifierKeysOnly)
 									{
-										ShortcutPair shortcutPairCopy = shortcutPair;
-										int[] arrDenormalizedPressedKeys = [.. PressedKeys.Select(DenormalizeKey)];
-										if(shortcutPair.NewShortcut.IsModifierKeysOnly)
+										Task.Run(async () =>
 										{
-											IsMappingInProgress = true;
-											Task.Run(async () =>
-											{
-												await Task.Delay(15);
-												MapShortcut(shortcutPairCopy, arrDenormalizedPressedKeys);
-											});
-										}
-										else
-										{
-											Task.Run(() => MapShortcut(shortcutPairCopy, arrDenormalizedPressedKeys));
-										}
-										result = 1;
+											await Task.Delay(15);
+											MapShortcut(shortcutPairCopy, arrDenormalizedPressedKeys);
+										});
 									}
+									else
+									{
+										Task.Run(() => MapShortcut(shortcutPairCopy, arrDenormalizedPressedKeys));
+									}
+									result = 1;
 								}
-							}
-							else
-							{
-								result = 1;
 							}
 						}
 					}
 					else if(isKeyUp)
 					{
 						PressedKeys.Remove(vkCode);
-						IsMappingInProgress = false;
 						result = 0;
 					}
                 }
@@ -935,7 +926,6 @@ namespace KeyMapper
                     hHook = SetWindowsHookEx(WH_KEYBOARD_LL, hookProc, hmod, 0);
 				}
             }
-			IsMappingInProgress = false;
 		}
 		public void StopMapping()
         {
