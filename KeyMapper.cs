@@ -11,6 +11,8 @@ using System.Text;
 using System.Text.Json;
 using System.Timers;
 using Windows.System;
+using static KeyMapper.StandardAccessRights;
+using static KeyMapper.ProcessAccessRights;
 using static KeyMapper.CmdShow;
 using static KeyMapper.ExtendedWindowStyles;
 using static KeyMapper.GetWindowLongOffset;
@@ -28,7 +30,41 @@ using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace KeyMapper
 {
-    public struct UCmd
+	public struct StandardAccessRights
+	{
+		public const uint DELETE                           = 0x00010000;
+		public const uint READ_CONTROL                     = 0x00020000;
+		public const uint WRITE_DAC                        = 0x00040000;
+		public const uint WRITE_OWNER                      = 0x00080000;
+		public const uint SYNCHRONIZE                      = 0x00100000;
+		public const uint STANDARD_RIGHTS_REQUIRED         = 0x000F0000;
+		public const uint STANDARD_RIGHTS_READ             = READ_CONTROL;
+		public const uint STANDARD_RIGHTS_WRITE            = READ_CONTROL;
+		public const uint STANDARD_RIGHTS_EXECUTE          = READ_CONTROL;
+		public const uint STANDARD_RIGHTS_ALL              = 0x001F0000;
+		public const uint SPECIFIC_RIGHTS_ALL              = 0x0000FFFF;
+		public const uint ACCESS_SYSTEM_SECURITY           = 0x01000000;
+		public const uint MAXIMUM_ALLOWED                  = 0x02000000;
+	}
+	public struct ProcessAccessRights
+	{
+		public const uint PROCESS_TERMINATE                  = 0x0001;  
+		public const uint PROCESS_CREATE_THREAD              = 0x0002;  
+		public const uint PROCESS_SET_SESSIONID              = 0x0004;  
+		public const uint PROCESS_VM_OPERATION               = 0x0008;  
+		public const uint PROCESS_VM_READ                    = 0x0010;  
+		public const uint PROCESS_VM_WRITE                   = 0x0020;  
+		public const uint PROCESS_DUP_HANDLE                 = 0x0040;  
+		public const uint PROCESS_CREATE_PROCESS             = 0x0080;  
+		public const uint PROCESS_SET_QUOTA                  = 0x0100;  
+		public const uint PROCESS_SET_INFORMATION            = 0x0200;  
+		public const uint PROCESS_QUERY_INFORMATION          = 0x0400;  
+		public const uint PROCESS_SUSPEND_RESUME             = 0x0800;  
+		public const uint PROCESS_QUERY_LIMITED_INFORMATION  = 0x1000;  
+		public const uint PROCESS_SET_LIMITED_INFORMATION    = 0x2000;
+		public const uint PROCESS_ALL_ACCESS				 = STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0xFFFF;
+	}
+	public struct UCmd
     {
         public const int GW_HWNDFIRST		= 0;
         public const int GW_HWNDLAST		= 1;
@@ -451,26 +487,41 @@ namespace KeyMapper
 			{
 				wVk = (WORD)vkCode,
 				wScan = (WORD)MapVirtualKey((UINT)vkCode, MAPVK_VK_TO_VSC),
-				dwFlags = dwFlags | KEYEVENTF_SCANCODE,
+				dwFlags = vkCode >= VK_LSHIFT && vkCode <= VK_RMENU ? dwFlags | KEYEVENTF_EXTENDEDKEY : dwFlags,
 				time = 0,
-				dwExtraInfo = (ULONG_PTR)GetMessageExtraInfo()
+				dwExtraInfo = CustomExtraInfo
 			};
 		}
 	}
-	public class WindowInfo(HWND hwnd, Process process, string? title)
+	public class WindowInfo(HWND hwnd, DWORD pid, string? title)
     {
         public HWND Hwnd { get; } = hwnd;
-        public Process Process { get; } = process;
-        public string Title { get; } = title ?? "";
+        public DWORD ProcessId { get; } = pid;
+		public string Title { get; } = title ?? "";
     }
     public class Win32Helper
     {
         public delegate LRESULT LowLevelKeyboardProcDlgt(int nCode, WPARAM wParam, LPARAM lParam);
         public delegate BOOL EnumWindowsProcDlgt(HWND hwnd, LPARAM lParam);
+		public const DWORD MAX_PATH = 260;
+		public const ULONG_PTR CustomExtraInfo = 0x12345;
 		public static int[] ModifierKeys { get; } = [VK_LCONTROL, VK_RCONTROL, VK_CONTROL, VK_LSHIFT, VK_RSHIFT, VK_SHIFT, VK_LWIN, VK_RWIN, VK_LMENU, VK_RMENU, VK_MENU];
 		[DllImport("Kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         public static extern HMODULE GetModuleHandle([In, Optional] LPCTSTR lpModuleName);
-        [DllImport("User32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+		[DllImport("Kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+		public static extern HANDLE OpenProcess(
+			[In] DWORD dwDesiredAccess,
+			[In] BOOL bInheritHandle,
+			[In] DWORD dwProcessId);
+		[DllImport("Kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+		public static extern BOOL CloseHandle([In] HANDLE hObject);
+		[DllImport("Kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+		public static extern BOOL QueryFullProcessImageName(
+			[In] HANDLE hProcess,
+			[In] DWORD dwFlags,
+			[In, Out] StringBuilder lpExeName,
+			[In, Out] ref DWORD lpdwSize);
+		[DllImport("User32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         public static extern BOOL EnumWindows(
             [In] WNDENUMPROC lpEnumFunc,
             [In] LPARAM lParam);
@@ -502,29 +553,6 @@ namespace KeyMapper
             [In] HWND hWnd,
             [In, Out] StringBuilder lpString,
             [In] int nMaxCount);
-        public static string? GetWindowTitle(HWND hWnd)
-        {
-            string? title = null;
-            try
-            {
-                int length = GetWindowTextLength(hWnd);
-                if(length > 0)
-                {
-                    length++;
-					StringBuilder builder = new StringBuilder(length);
-                    if(GetWindowText(hWnd, builder, length) > 0)
-                    {
-                        title = builder.ToString();
-					}
-				}
-			}
-            catch(Exception e)
-            {
-				title = null;
-				Debug.WriteLine(e);
-            }
-            return title;
-        }
 		[DllImport("User32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         public static extern HHOOK SetWindowsHookEx(
             [In] int idHook,
@@ -556,6 +584,66 @@ namespace KeyMapper
 		public static extern UINT MapVirtualKey(
 			[In] UINT uCode,
 			[In] UINT uMapType);
+		public static string? GetWindowTitle(HWND hWnd)
+		{
+			string? title = null;
+			try
+			{
+				int length = GetWindowTextLength(hWnd);
+				if(length > 0)
+				{
+					length++;
+					StringBuilder builder = new StringBuilder(length);
+					if(GetWindowText(hWnd, builder, length) > 0)
+					{
+						title = builder.ToString();
+					}
+				}
+			}
+			catch(Exception e)
+			{
+				title = null;
+				Debug.WriteLine(e);
+			}
+			return title;
+		}
+		public static string? GetApplicationName(DWORD pid)
+		{
+			string? applicationName = null;
+			try
+			{
+				HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+				if(hProcess != nint.Zero)
+				{
+					StringBuilder stringBuilder = new StringBuilder((int)MAX_PATH);
+					DWORD dwSize = MAX_PATH;
+					if(QueryFullProcessImageName(hProcess, 0, stringBuilder, ref dwSize))
+					{
+						string filePath = stringBuilder.ToString();
+						if(!string.IsNullOrWhiteSpace(filePath) && File.Exists(filePath))
+						{
+							FileVersionInfo fileVersionInfo = FileVersionInfo.GetVersionInfo(filePath);
+							if(fileVersionInfo != null)
+							{
+								applicationName = !string.IsNullOrWhiteSpace(fileVersionInfo.FileDescription) ? fileVersionInfo.FileDescription :
+									!string.IsNullOrWhiteSpace(fileVersionInfo.ProductName) ? fileVersionInfo.ProductName : fileVersionInfo.FileName;
+							}
+							if(string.IsNullOrWhiteSpace(applicationName))
+							{
+								applicationName = Path.GetFileName(filePath);
+							}
+						}
+					}
+					CloseHandle(hProcess);
+				}
+			}
+			catch(Exception e)
+			{
+				applicationName = null;
+				Debug.WriteLine(e);
+			}
+			return applicationName;
+		}
 	}
 	public class Shortcut : INotifyPropertyChanged
 	{
@@ -651,7 +739,6 @@ namespace KeyMapper
         private HOOKPROC hookProc;
         private WNDENUMPROC wndEnumProc;
 		private HashSet<int> PressedKeys { get; } = [];
-		//private bool IsMappingInProgress { get; set; } = false;
 		public List<WindowInfo> ActiveWindows 
 		{ 
 			get;
@@ -730,23 +817,16 @@ namespace KeyMapper
                         GetWindowThreadProcessId(hwnd, out pid);
                         if(pid > 0)
                         {
-                            using(Process process = Process.GetProcessById((int)pid))
+                            HWND owner = GetWindow(hwnd, GW_OWNER);
+                            ULONG style = (ULONG)GetWindowLong(hwnd, GWL_STYLE);
+                            ULONG extStyle = (ULONG)GetWindowLong(hwnd, GWL_EXSTYLE);
+                            if((style & WS_CHILD) == 0 && ((extStyle & WS_EX_APPWINDOW) != 0 || (extStyle & WS_EX_TOOLWINDOW) == 0 && (owner == nint.Zero)))
                             {
-                                if(!string.IsNullOrWhiteSpace(process?.ProcessName) && !process.ProcessName.Equals("system", StringComparison.OrdinalIgnoreCase)
-                                    && !process.ProcessName.Equals("idle", StringComparison.OrdinalIgnoreCase))
+								string? title = GetApplicationName(pid);
+								if(!string.IsNullOrWhiteSpace(title) && !listWindows.Any(winInfo => string.Equals(winInfo.ProcessId, pid)))
                                 {
-                                    HWND owner = GetWindow(hwnd, GW_OWNER);
-                                    ULONG style = (ULONG)GetWindowLong(hwnd, GWL_STYLE);
-                                    ULONG extStyle = (ULONG)GetWindowLong(hwnd, GWL_EXSTYLE);
-                                    if((style & WS_CHILD) == 0 && ((extStyle & WS_EX_APPWINDOW) != 0 || (extStyle & WS_EX_TOOLWINDOW) == 0 && (owner == nint.Zero)))
-                                    {
-                                        string? title = GetWindowTitle(hwnd) ?? process.ProcessName;
-                                        if(!listWindows.Any(winInfo => string.Equals(winInfo.Title, title)))
-                                        {
-                                            WindowInfo windowInfo = new WindowInfo(hwnd, process, title);
-                                            listWindows.Add(windowInfo);
-                                        }
-                                    }
+                                    WindowInfo windowInfo = new WindowInfo(hwnd, pid, title);
+                                    listWindows.Add(windowInfo);
                                 }
                             }
                         }
@@ -767,7 +847,6 @@ namespace KeyMapper
             {
                 try
                 {
-					//int vkCode = (int)hookStruct.vkCode;
 					int vkCode = NormalizeKey((int)hookStruct.vkCode);
 					bool isKeyDown = wParam == (nint)WM_KEYDOWN || wParam == (nint)WM_SYSKEYDOWN;
                     bool isKeyUp = wParam == (nint)WM_KEYUP || wParam == (nint)WM_SYSKEYUP;
@@ -776,34 +855,20 @@ namespace KeyMapper
 						if(IsTargetApplicationActive())
 						{
 							bool isNewKey = PressedKeys.Add(vkCode);
-							if(isNewKey)
+							ShortcutPair? shortcutPair = FindShortcut();
+							if(shortcutPair != null)
 							{
-								ShortcutPair? shortcutPair = FindShortcut();
-								if(shortcutPair != null)
+								if(isNewKey)
 								{
-									ShortcutPair shortcutPairCopy = shortcutPair;
-									int[] arrDenormalizedPressedKeys = [.. PressedKeys.Select(DenormalizeKey)];
-									if(shortcutPair.NewShortcut.IsModifierKeysOnly)
-									{
-										Task.Run(async () =>
-										{
-											await Task.Delay(15);
-											MapShortcut(shortcutPairCopy, arrDenormalizedPressedKeys);
-										});
-									}
-									else
-									{
-										Task.Run(() => MapShortcut(shortcutPairCopy, arrDenormalizedPressedKeys));
-									}
-									result = 1;
+									MapShortcut(shortcutPair);
 								}
+								result = 1;
 							}
 						}
 					}
 					else if(isKeyUp)
 					{
 						PressedKeys.Remove(vkCode);
-						result = 0;
 					}
                 }
                 catch(Exception e)
@@ -815,6 +880,63 @@ namespace KeyMapper
             }
             return (INT)result == 1 ? 1 : CallNextHookEx(nint.Zero, nCode, wParam, lParam);
         }
+		private void MapShortcut(ShortcutPair shortcutPair)
+		{
+			try
+			{
+				bool isModifierKeysOnlyShortcut = shortcutPair.NewShortcut.IsModifierKeysOnly;
+				int[] arrDenormalizedPressedKeys = [.. PressedKeys.Select(DenormalizeKey).Reverse()];
+				int[] arrCurrentKeyCodes = [.. shortcutPair.CurrentShortcut.KeyCodes.Select(DenormalizeKey)];
+				int inputCount = arrCurrentKeyCodes.Length * 2 + (isModifierKeysOnlyShortcut ? arrDenormalizedPressedKeys.Length + 2 : 0);
+				int index = 0;
+				INPUT[] arrInputs = new INPUT[inputCount];
+				if(isModifierKeysOnlyShortcut)
+				{
+					arrInputs[index++].SetKeyboardInput(VK_NONAME);
+					arrInputs[index++].SetKeyboardInput(VK_NONAME, KEYEVENTF_KEYUP);
+					foreach(int vkCode in arrDenormalizedPressedKeys)
+					{
+						arrInputs[index++].SetKeyboardInput(vkCode, KEYEVENTF_KEYUP);
+					}
+				}
+				foreach(int vkCode in arrCurrentKeyCodes)
+				{
+					arrInputs[index++].SetKeyboardInput(vkCode);
+				}
+				int[] arrCurrentKeyCodesReversed = arrCurrentKeyCodes.Reverse().ToArray();
+				foreach(int vkCode in arrCurrentKeyCodesReversed)
+				{
+					arrInputs[index++].SetKeyboardInput(vkCode, KEYEVENTF_KEYUP);
+				}
+				SendInput((uint)inputCount, arrInputs, Marshal.SizeOf<INPUT>());
+			}
+			catch(Exception e)
+			{
+				Debug.WriteLine(e);
+				throw;
+			}
+		}
+		private ShortcutPair? FindShortcut()
+		{
+			ShortcutPair? shortcutPair = null;
+			try
+			{
+				HashSet<int> NormalizedPressedKeys = PressedKeys.Select(NormalizeKey).ToHashSet();
+				shortcutPair = ShortcutMap.OrderByDescending(pair => pair.NewShortcut.KeyCodes.Count)
+					.FirstOrDefault(pair => NormalizedPressedKeys.SetEquals(pair.NewShortcut.KeyCodes.Select(NormalizeKey)));
+				if(shortcutPair != null && (shortcutPair.CurrentShortcut.KeyCodes.Count == 0 || shortcutPair.NewShortcut.KeyCodes.Count == 0))
+				{
+					shortcutPair = null;
+				}
+			}
+			catch(Exception e)
+			{
+				shortcutPair = null;
+				Debug.WriteLine(e);
+				throw;
+			}
+			return shortcutPair;
+		}
 		private static int NormalizeKey(int vkCode)
 		{
 			return vkCode switch
@@ -843,7 +965,17 @@ namespace KeyMapper
                 if(SelectedWindowInfo != null && SelectedWindowInfo.Hwnd != nint.Zero)
                 {
                     HWND hwnd = GetForegroundWindow();
-                    isActive = hwnd != nint.Zero && hwnd == SelectedWindowInfo.Hwnd;
+					//isActive = hwnd != nint.Zero && hwnd == SelectedWindowInfo.Hwnd;
+					if(hwnd != nint.Zero)
+					{
+						DWORD pid = 0;
+						GetWindowThreadProcessId(hwnd, out pid);
+						if(pid > 0)
+						{
+							string? title = GetApplicationName(pid);
+							isActive = string.Equals(SelectedWindowInfo.Title, title);
+						}
+					}
                 }
             }
             catch(Exception e)
@@ -854,68 +986,6 @@ namespace KeyMapper
             }
             return isActive;
         }
-		private ShortcutPair? FindShortcut()
-		{
-			ShortcutPair? shortcutPair = null;
-			try
-			{
-				HashSet<int> NormalizedPressedKeys = PressedKeys.Select(NormalizeKey).ToHashSet();
-				shortcutPair = ShortcutMap.OrderByDescending(pair => pair.NewShortcut.KeyCodes.Count)
-					.FirstOrDefault(pair => NormalizedPressedKeys.SetEquals(pair.NewShortcut.KeyCodes.Select(NormalizeKey)));
-				if(shortcutPair != null && (shortcutPair.CurrentShortcut.KeyCodes.Count == 0 || shortcutPair.NewShortcut.KeyCodes.Count == 0))
-				{
-					shortcutPair = null;
-				}
-			}
-			catch(Exception e)
-			{
-				shortcutPair = null;
-				Debug.WriteLine(e);
-				throw;
-			}
-			return shortcutPair;
-		}
-		private void MapShortcut(ShortcutPair shortcutPair, int[] arrDenormalizedPressedKeys)
-		{
-			try
-			{
-				bool isModifierKeysOnlyShortcut = shortcutPair.NewShortcut.IsModifierKeysOnly;
-				int[] arrCurrentKeyCodes = [.. shortcutPair.CurrentShortcut.KeyCodes.Select(DenormalizeKey)];
-				int inputCount = arrCurrentKeyCodes.Length * 2 + (isModifierKeysOnlyShortcut ? arrDenormalizedPressedKeys.Length + 2 : 0);
-				int index = 0;
-				INPUT[] arrInputs = new INPUT[inputCount];
-				if(isModifierKeysOnlyShortcut)
-				{
-					/*
-					lock(PressedKeys)
-					{
-						PressedKeys.Clear();
-					}
-					*/
-					arrInputs[index++].SetKeyboardInput(VK_NONAME);
-					arrInputs[index++].SetKeyboardInput(VK_NONAME, KEYEVENTF_KEYUP);
-					foreach(int vkCode in arrDenormalizedPressedKeys)
-					{
-						arrInputs[index++].SetKeyboardInput(vkCode, KEYEVENTF_KEYUP);
-					}
-				}
-				foreach(int vkCode in arrCurrentKeyCodes)
-				{
-					arrInputs[index++].SetKeyboardInput(vkCode);
-				}
-				int[] arrCurrentKeyCodesReversed = arrCurrentKeyCodes.Reverse().ToArray();
-				foreach(int vkCode in arrCurrentKeyCodesReversed)
-				{
-					arrInputs[index++].SetKeyboardInput(vkCode, KEYEVENTF_KEYUP);
-				}
-				SendInput((uint)inputCount, arrInputs, Marshal.SizeOf<INPUT>());
-			}
-			catch(Exception e)
-			{
-				Debug.WriteLine(e);
-				throw;
-			}
-		}
 		public void StartMapping()
         {
             using(Process process = Process.GetCurrentProcess())
@@ -926,6 +996,7 @@ namespace KeyMapper
                     hHook = SetWindowsHookEx(WH_KEYBOARD_LL, hookProc, hmod, 0);
 				}
             }
+			PressedKeys.Clear();
 		}
 		public void StopMapping()
         {

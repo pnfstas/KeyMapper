@@ -20,6 +20,7 @@ global using LPCTSTR = string;
 global using HHOOK = nint;
 global using HINSTANCE = nint;
 global using HMODULE = nint;
+global using HANDLE = nint;
 global using HWND = nint;
 global using HOOKPROC = KeyMapper.Win32Helper.LowLevelKeyboardProcDlgt;
 global using WNDENUMPROC = KeyMapper.Win32Helper.EnumWindowsProcDlgt;
