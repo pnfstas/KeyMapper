@@ -11,6 +11,7 @@ global using LPARAM = nint;
 global using LRESULT = nint;
 global using LONG_PTR = nint;
 global using ULONG_PTR = nuint;
+global using DWORD_PTR = nuint;
 global using LPSTR = string;
 global using LPCSTR = string;
 global using LPWSTR = string;

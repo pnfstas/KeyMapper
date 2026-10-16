@@ -485,17 +485,16 @@ namespace KeyMapper
 		{
 			type = INPUT_KEYBOARD;
 			WORD wScanCode = (WORD)MapVirtualKey((UINT)vkCode, MAPVK_VK_TO_VSC_EX);
+			(BYTE low, BYTE high) wScanCodeBytes = vkCode switch
+			{
+				VK_LWIN or VK_RWIN => (low: LOBYTE(wScanCode), high: 0xE0),
+				_ => (low: LOBYTE(wScanCode), high: HIBYTE(wScanCode))
+			};
 			ki = new KEYBDINPUT()
 			{
 				wVk = (WORD)vkCode,
-				wScan = vkCode switch
-				{ 
-				VK_LWIN => 0x5B,
-				VK_RWIN => 0x5C,
-				_ => (WORD)MapVirtualKey((UINT)vkCode, MAPVK_VK_TO_VSC_EX)
-				},
-				//dwFlags = vkCode == VK_MENU || vkCode == VK_LMENU || vkCode == VK_RMENU || vkCode == VK_LWIN || vkCode == VK_RWIN ? dwFlags | KEYEVENTF_EXTENDEDKEY : dwFlags,
-				dwFlags = ExtendedKeys.Contains(vkCode) || vkCode == VK_LWIN || vkCode == VK_RWIN ? dwFlags | KEYEVENTF_EXTENDEDKEY : dwFlags,
+				wScan = wScanCodeBytes.low,
+				dwFlags = wScanCodeBytes.high == 0xE0 || wScanCodeBytes.high == 0xE1 ? dwFlags | KEYEVENTF_EXTENDEDKEY : dwFlags,
 				time = 0,
 				dwExtraInfo = CustomExtraInfo
 			};
@@ -545,6 +544,8 @@ namespace KeyMapper
 			VK_SNAPSHOT,
 			VK_DIVIDE,
 			//VK_RETURN,
+			VK_LWIN,
+			VK_RWIN,
 			VK_APPS
 		];
 		[DllImport("Kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
@@ -629,6 +630,10 @@ namespace KeyMapper
 		public static extern UINT MapVirtualKey(
 			[In] UINT uCode,
 			[In] UINT uMapType);
+		public static BYTE LOBYTE(DWORD value) => (BYTE)(value & 0xff);
+		public static BYTE HIBYTE(DWORD value) => (BYTE)((value >> 8) & 0xff);
+		public static WORD LOWORD(DWORD value) => (WORD)(value & 0xffff);
+		public static WORD HIWORD(DWORD value) => (WORD)((value >> 16) & 0xffff);
 		public static string? GetWindowTitle(HWND hWnd)
 		{
 			string? title = null;
@@ -960,76 +965,6 @@ namespace KeyMapper
 				throw;
 			}
 		}
-		/*
-		private void MapShortcut_Ver1(ShortcutPair shortcutPair)
-		{
-			try
-			{
-				int[] arrDenormalizedPressedKeys = [.. PressedKeys.Select(DenormalizeKey).Reverse()];
-				int[] arrTargetKeyCodes = [.. shortcutPair.CurrentShortcut.KeyCodes.Select(DenormalizeKey)];
-				int[] arrTargetKeyCodesReversed = arrTargetKeyCodes.Reverse().ToArray();
-				int inputCount = arrDenormalizedPressedKeys.Length + 2 + arrTargetKeyCodes.Length * 2;
-				int index = 0;
-				INPUT[] arrInputs = new INPUT[inputCount];
-				arrInputs[index++].SetKeyboardInput(VK_NONAME);
-				arrInputs[index++].SetKeyboardInput(VK_NONAME, KEYEVENTF_KEYUP);
-				foreach(int vkCode in arrDenormalizedPressedKeys)
-				{
-					arrInputs[index++].SetKeyboardInput(vkCode, KEYEVENTF_KEYUP);
-				}
-				foreach(int vkCode in arrTargetKeyCodes)
-				{
-					arrInputs[index++].SetKeyboardInput(vkCode);
-				}
-				foreach(int vkCode in arrTargetKeyCodesReversed)
-				{
-					arrInputs[index++].SetKeyboardInput(vkCode, KEYEVENTF_KEYUP);
-				}
-				SendInput((uint)inputCount, arrInputs, Marshal.SizeOf<INPUT>());
-			}
-			catch(Exception e)
-			{
-				Debug.WriteLine(e);
-				throw;
-			}
-		}
-		private void MapShortcut_Ver2(ShortcutPair shortcutPair)
-		{
-			try
-			{
-				int[] arrTargetKeyCodes = [.. shortcutPair.CurrentShortcut.KeyCodes.Select(DenormalizeKey)];
-				bool isModifierKeysOnlyShortcut = shortcutPair.NewShortcut.IsModifierKeysOnly;
-				if(isModifierKeysOnlyShortcut)
-				{
-					int[] arrDenormalizedPressedKeys = [.. PressedKeys.Select(DenormalizeKey).Reverse()];
-					int inputCount = arrDenormalizedPressedKeys.Length + 2;
-					int index = 0;
-					INPUT[] arrInputs = new INPUT[inputCount];
-					arrInputs[index++].SetKeyboardInput(VK_NONAME);
-					arrInputs[index++].SetKeyboardInput(VK_NONAME, KEYEVENTF_KEYUP);
-					foreach(int vkCode in arrDenormalizedPressedKeys)
-					{
-						arrInputs[index++].SetKeyboardInput(vkCode, KEYEVENTF_KEYUP);
-					}
-					SendInput((uint)inputCount, arrInputs, Marshal.SizeOf<INPUT>());
-					Task.Run(async () =>
-					{
-						await Task.Delay(10);
-						SendTargetShortcut(arrTargetKeyCodes);
-					});
-				}
-				else
-				{
-					SendTargetShortcut(arrTargetKeyCodes);
-				}
-			}
-			catch(Exception e)
-			{
-				Debug.WriteLine(e);
-				throw;
-			}
-		}
-		*/
 		private void SendTargetShortcut(int[] arrTargetKeyCodes)
 		{
 			try
